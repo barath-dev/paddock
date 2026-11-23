@@ -861,17 +861,23 @@ pub fn serve() -> Result<()> {
     for worker in workers {
         let _ = worker.join();
     }
+    let restart = app.restart.load(Ordering::SeqCst);
+    // Said in the log before the marker goes: whatever waits for the marker to go
+    // (paddock stop, the tests) then finds the log already says why.
+    if restart {
+        eprintln!("{} paddock {VERSION} stopped; starting the new version", log_stamp());
+    } else {
+        eprintln!("{} paddock stopped ({reason})", log_stamp());
+    }
     // The pid file is the tool's own marker that a server is running.
     if fs::read_to_string(pid_file()).is_ok_and(|pid| pid.trim() == std::process::id().to_string()) {
         let _ = fs::remove_file(pid_file());
     }
-    if app.restart.load(Ordering::SeqCst) {
+    if restart {
         // The listener is gone; the new program takes the port over.
         drop(server);
-        eprintln!("{} paddock {VERSION} stopped; starting the new version", log_stamp());
         return start_detached(&os::installed_program());
     }
-    eprintln!("{} paddock stopped ({reason})", log_stamp());
     Ok(())
 }
 
