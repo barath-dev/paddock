@@ -2,7 +2,7 @@
 
 // Loaded before the page paints, so the chosen theme, template and primary
 // colour never flash the defaults first, and the classic page hands over to the
-// Finder view straight away when that was the last one used.
+// Finder or Simple layout straight away when that was the last one used.
 (() => {
   // Settings keeps choices in memory as well, for browsers that keep no storage.
   const memory = window.ccMemory || (window.ccMemory = {});
@@ -11,8 +11,9 @@
     try { return localStorage.getItem(key); } catch { return null; }
   };
 
-  if (read('cc-view') === 'finder' && location.pathname === '/') {
-    location.replace(`/finder${location.search}`);
+  const start = { finder: '/finder', simple: '/simple' }[read('cc-view')];
+  if (start && location.pathname === '/') {
+    location.replace(`${start}${location.search}${location.hash}`);
   }
 
   // White or near-black, whichever reads better on the colour.

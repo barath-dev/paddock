@@ -170,7 +170,28 @@ files in them, accounts as tags in the sidebar.
   day (or move to it with the arrow keys and press Enter) to see its tokens by kind, hour
   and account, how it compares with its week and the year, and the sessions that used them.
 
-### Both layouts
+### Simple layout
+
+A card for each project folder, and nothing else to learn. Pick it in Settings ›
+Appearance › Layout; the page then opens on it (`/simple`).
+
+- **Cards**: each shows the folder, the accounts used in it, how it is doing (`2 need you`,
+  `1 working`, or when it was last used) and its sessions, needing you first, then
+  working, then the latest. **+ N more** opens the rest of a card's sessions. Projects
+  that need you come first, then working, then pinned, then the most recently used;
+  ones not used for 30 days fold under **Show older projects**.
+- **One button per session**: **Open** for a running one, **Resume** for a saved one. Its
+  **⋯** menu has Rename, Pin, Copy command, Team, Open in your editor and Close. A
+  card's **⋯** pins the project to the top or opens it in your editor.
+- **Account chips** show one account's projects (the choice is remembered), the line under
+  them counts **today's tokens**, and **Teams working** appears while a team is running,
+  each opening its Team page.
+- **Search** (`/` to start, Esc to clear) finds projects by folder, session names and
+  prompts.
+
+The templates, theme and primary colour from Settings apply here as on the other layouts.
+
+### Every layout
 
 - **Rename** a session with the pencil on its row, by double-clicking its name, or with
   Enter in the Finder layout. The name is kept by Paddock and shown in the page and on
@@ -197,6 +218,40 @@ a terminal, doing nothing), `Done` (background task finished, not closed), `Clos
 A Codex account's name is shown with a small **Codex** mark where the name does not
 already say so.
 
+### Teams
+
+**Team**, in a Claude Code session's details, opens a page that draws the session as a
+team: the session itself leads, at the top, and its members, the sub-agents it can hand
+work to, sit under it, each in the colour of its model (Opus, Sonnet, Haiku). A member's
+box lights up and the line to it moves while it is running, and the list under the
+drawing shows every sub-agent the session started, with its task, model and tokens.
+Sub-agents it started that are not members, such as Claude Code's own `Explore`, are
+drawn on a row of their own.
+
+- **Add a member** with a name, a model and one sentence on what it does, which the lead
+  reads to decide when to hand work over. Instructions are optional. Members are Claude
+  Code agent files, `<project>/.claude/agents/<name>.md`, so any session started in that
+  folder can use them; one already running in a terminal sees a new member once it is resumed. Editing
+  a file keeps what else its front matter says, such as `tools`.
+- **Report review** sets up a team in one click: the lead analyses the report, `scorer`
+  on Sonnet scores it and `answer-checker` on Haiku checks the answers.
+- **Run the team**: say what the team should work on and pick the lead's model (Opus by
+  default). Claude Code runs it in the background (`claude --bg`): a closed session is
+  continued, and for one open in a terminal the team starts as a new session in the same
+  folder, which the page then follows. Either way Claude Code starts afresh, so it sees
+  the members as they are now. The folder must be one you have trusted in Claude Code.
+  If the lead stops to ask you something, its box says so and opens it in a terminal.
+  **Copy the prompt instead** gives the same brief to paste into a session yourself.
+- **Remove** moves the member's file into Paddock's `removed-agents` folder rather than
+  deleting it.
+
+**Teams**, in the Finder sidebar, watches every team at once. It counts the teams working
+right now, and its view shows each Claude Code session whose sub-agents worked in the last
+day: the lead with its model and how it is doing, and each sub-agent with its model and
+what it is working on, pulsing while it runs. Sub-agents that are not members of the team
+have a dashed outline. Working teams come first. It updates every few seconds, and
+**Open team** opens that team's page.
+
 ## What it never does
 
 - It never deletes or moves anything under an account folder. The test suite checks this
@@ -207,6 +262,8 @@ already say so.
 - Renaming an account or its shortcut changes nothing inside the account folder.
 - Renaming or pinning a session changes nothing in its transcript. Names and pins are kept
   in `titles.json` and `pins.json`.
+- The one place it writes outside its own folder is a project's `.claude/agents`, when you
+  add or change a team member. What the lead does is kept in `teams.json`.
 - Its own records are rewritten in place with the previous version kept as `<file>.bak`.
 
 The only files it removes are its own launchers: its pid file, a command link it created
@@ -281,6 +338,8 @@ In the settings folder above:
 | `closed.json` | Sessions closed through the tool. |
 | `titles.json` | Names you gave to sessions. |
 | `pins.json` | Sessions and folders you pinned. |
+| `teams.json` | What each team's lead does, as written on the Team page. |
+| `removed-agents/` | Team members' files, moved here when they are removed from a team. |
 | `history-cache.json` | Rebuildable index of saved conversations, with their token counts. |
 | `ui-token` | Access key for the web app (readable only by you). |
 | `ui.pid`, `ui.log` | The running server's pid and its log. |

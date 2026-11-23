@@ -28,6 +28,7 @@ use crate::report;
 use crate::resume::{self, Target};
 use crate::sessions::{self, Session};
 use crate::store::{state_dir, state_file};
+use crate::team;
 use crate::titles;
 use crate::update;
 use crate::util::{err, expand_tilde, log_stamp, now_ms, setting, tilde, Error, Result};
@@ -60,6 +61,12 @@ const UI: &[(&str, &str, &[u8])] = &[
     ("/concept", "text/html; charset=utf-8", include_bytes!("../ui/concept.html")),
     ("/concept.js", "text/javascript; charset=utf-8", include_bytes!("../ui/concept.js")),
     ("/concept.css", "text/css; charset=utf-8", include_bytes!("../ui/concept.css")),
+    ("/simple", "text/html; charset=utf-8", include_bytes!("../ui/simple.html")),
+    ("/simple.js", "text/javascript; charset=utf-8", include_bytes!("../ui/simple.js")),
+    ("/simple.css", "text/css; charset=utf-8", include_bytes!("../ui/simple.css")),
+    ("/team", "text/html; charset=utf-8", include_bytes!("../ui/team.html")),
+    ("/team.js", "text/javascript; charset=utf-8", include_bytes!("../ui/team.js")),
+    ("/team.css", "text/css; charset=utf-8", include_bytes!("../ui/team.css")),
 ];
 
 pub fn port() -> u16 {
@@ -355,6 +362,58 @@ impl App {
         Ok(json!({ "sessions": found.into_iter().take(50).map(|(_, row)| row).collect::<Vec<_>>() }))
     }
 
+    /// The folder an open session runs in, as Claude Code reports it.
+    fn running_in(&self, account: &str, session_id: &str) -> Result<Option<String>> {
+        let listing = self.sessions(false)?;
+        Ok(listing.0.iter().find(|s| s.open && s.account == account && s.session_id == session_id).map(|s| s.cwd.clone()))
+    }
+
+    /// A session's team, for the team page: `?account=<name>&session=<id>`.
+    fn team(&self, query: &str) -> Result<Value> {
+        let param = |name: &str| query.split('&').find_map(|pair| pair.strip_prefix(name)?.strip_prefix('=')).unwrap_or("");
+        self.team_of(&self.sessions(false)?.0, param("account"), param("session"))
+    }
+
+    fn team_of(&self, listing: &[Session], account: &str, session_id: &str) -> Result<Value> {
+        let session = listing.iter().find(|s| s.account == account && s.session_id == session_id);
+        let title = match session {
+            Some(sess) => Some(sess.name.clone()),
+            None => titles::Titles::load()?.get(&accounts::get_account(account)?.dir, session_id).map(String::from),
+        };
+        let running_in = session.filter(|s| s.open).map(|s| s.cwd.as_str());
+        let mut team = team::team(account, session_id, running_in, title)?;
+        // How the lead is doing, and what the page asks for to open it in a terminal.
+        if let (Some(sess), Some(fields)) = (session, team.as_object_mut()) {
+            fields.insert("status".into(), json!(sess.status));
+            fields.insert("key".into(), json!(sess.key));
+        }
+        Ok(team)
+    }
+
+    /// Every team that has worked in the last day, the most recently busy first, for
+    /// the Teams view. One that cannot be read is left out rather than failing the rest.
+    fn teams(&self) -> Result<Value> {
+        let listing = self.sessions(false)?;
+        let since = now_ms() - 24 * 3_600_000;
+        let teams: Vec<Value> = team::recent(since)?
+            .iter()
+            .take(40)
+            .filter_map(|(account, session_id)| self.team_of(&listing.0, account, session_id).ok())
+            .collect();
+        Ok(json!({ "teams": teams }))
+    }
+
+    /// Start the team in the background, and say which session it runs as.
+    fn run_team(&self, account: &str, session_id: &str, body: &Value) -> Result<Value> {
+        let text = |field: &str| body.get(field).and_then(Value::as_str).unwrap_or("");
+        let running_in = self.running_in(account, session_id)?;
+        let id = team::run(account, session_id, running_in.as_deref(), text("prompt"), text("model"))?;
+        self.invalidate(false);
+        let listing = self.sessions(true)?;
+        let started = listing.0.iter().find(|s| s.account == account && s.id == id);
+        Ok(json!({ "ok": true, "id": id, "sessionId": started.map_or(session_id, |s| s.session_id.as_str()) }))
+    }
+
     // -- actions
 
     fn close(&self, keys: &[String]) -> Result<Value> {
@@ -516,6 +575,17 @@ impl App {
             "/api/pins" => self.pin(body, body.get("pinned").and_then(Value::as_bool).unwrap_or(true)),
             "/api/history/resume" => self.resume_history(need("account")?, need("sessionId")?),
             "/api/editor/open" => self.open_in_editor(need("editor")?, body),
+            "/api/team/run" => self.run_team(need("account")?, need("sessionId")?, body),
+            "/api/team/member" | "/api/team/remove" | "/api/team/lead" => {
+                let (account, session_id) = (need("account")?, need("sessionId")?);
+                let running_in = self.running_in(account, session_id)?;
+                let running_in = running_in.as_deref();
+                match path {
+                    "/api/team/member" => team::save_member(account, session_id, running_in, body.get("member").unwrap_or(&Value::Null)),
+                    "/api/team/remove" => team::remove_member(account, session_id, running_in, need("file")?),
+                    _ => team::set_lead(account, session_id, running_in, text("job").unwrap_or("")),
+                }
+            }
             "/api/update/check" => {
                 // A failed check is shown in the status, not as a failed request.
                 let _ = update::check();
@@ -628,6 +698,8 @@ fn static_file(path: &str) -> Option<(&'static str, Vec<u8>)> {
         let name = match path {
             "/" => "index.html",
             "/finder" | "/concept" => "concept.html",
+            "/team" => "team.html",
+            "/simple" => "simple.html",
             _ => &path[1..],
         };
         if let Ok(bytes) = fs::read(PathBuf::from(dir).join(name)) {
@@ -671,6 +743,8 @@ fn handle(app: &App, mut request: Request) {
             "/api/history" => app.history(),
             "/api/usage" => app.usage(),
             "/api/usage/sessions" => app.usage_sessions(&query),
+            "/api/team" => app.team(&query),
+            "/api/teams" => app.teams(),
             "/api/diagnostics" => Ok(report::diagnostics()),
             "/api/editors" => Ok(json!({ "editors": editors::installed().iter().map(|e| json!({ "id": e.id, "name": e.name })).collect::<Vec<_>>() })),
             _ => return respond_json(request, 404, &json!({ "error": "Not found." })),

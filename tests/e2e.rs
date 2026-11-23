@@ -1009,6 +1009,12 @@ fn server_guards_and_disconnect() {
     assert_eq!(m.get("/api/state", Some(&token), Some("evil.example")).0, 403, "wrong host");
     assert_eq!(m.get("/", None, Some("evil.example")).0, 403, "wrong host for the page");
     assert_eq!(m.get("/", None, None).0, 200, "the page itself needs no token");
+    // The Simple layout is served like the others, and refused like them.
+    for page in ["/simple", "/simple.js", "/simple.css"] {
+        assert_eq!(m.get(page, None, None).0, 200, "{page}");
+    }
+    assert!(m.get("/simple", None, None).1.contains("/simple.js"), "the Simple page loads its script");
+    assert_eq!(m.get("/simple", None, Some("evil.example")).0, 403, "wrong host for the Simple page");
     assert_eq!(m.post("/api/refresh", &token, "Content-Type: application/json\r\nOrigin: http://evil.example\r\n", "{}").0, 403);
     assert_eq!(m.post("/api/refresh", &token, "Content-Type: text/plain\r\n", "{}").0, 415);
     assert_eq!(m.post("/api/refresh", &token, "Content-Type: application/json\r\n", "{}").0, 200);
