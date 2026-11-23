@@ -25,6 +25,7 @@ mod sessions;
 mod setup;
 mod shell;
 mod store;
+mod team;
 mod titles;
 mod tools;
 mod update;

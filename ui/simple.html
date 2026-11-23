@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Paddock</title>
+  <link rel="icon" href="/favicon.svg">
+  <script src="/theme.js"></script>
+  <script src="/icons.js"></script>
+  <link rel="stylesheet" href="/simple.css">
+  <link rel="stylesheet" href="/settings.css">
+  <script src="/settings.js" defer></script>
+  <script src="/simple.js" defer></script>
+</head>
+<body>
+  <header class="top">
+    <h1 class="brand">Paddock</h1>
+    <input type="search" id="search" class="search" placeholder="Search projects and sessions" aria-label="Search projects, sessions and prompts" autocomplete="off">
+    <button type="button" class="icon-btn" id="settings" aria-label="Settings" title="Settings"></button>
+  </header>
+
+  <main class="page">
+    <div class="filters" id="filters" role="group" aria-label="Accounts"></div>
+    <p class="today" id="today" hidden></p>
+    <section class="teams" id="teams" aria-label="Teams working now" hidden></section>
+    <div class="cards" id="cards" aria-live="polite"></div>
+  </main>
+
+  <div class="menu" id="menu" role="menu" hidden></div>
+  <dialog class="sheet" id="sheet" aria-labelledby="sheet-title"></dialog>
+  <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+</body>
+</html>

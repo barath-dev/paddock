@@ -1196,6 +1196,13 @@ function renderPanel(entries) {
   panelKey = e.key;
 }
 
+// A Claude Code session's sub-agents, drawn as a team, on a page of their own.
+function teamButton(e, cls) {
+  if (!e.sessionId || toolOf(e.account) !== 'claude') return null;
+  const url = `/team?account=${encodeURIComponent(e.account)}&session=${encodeURIComponent(e.sessionId)}`;
+  return h('button', { type: 'button', class: cls, title: 'Its sub-agents, as a team', onclick: () => window.open(url, '_blank') }, icon('users'), 'Team');
+}
+
 function entryDetails(e, where) {
   const { session: s, item } = e;
   const account = state.data.accounts.find((a) => a.name === e.account) || {};
@@ -1209,7 +1216,8 @@ function entryDetails(e, where) {
         onclick: () => copyText(e.command) }, icon('copy'), 'Copy command'),
       editorButton(e),
       e.sessionId && h('button', { type: 'button', class: 'btn btn-small', onclick: () => startRename(e, where) }, icon('pencil'), 'Rename'),
-      pinButton(e)),
+      pinButton(e),
+      teamButton(e, 'btn btn-small')),
     h('dl', { class: 'facts' }, [
       ['Account', `${e.account}${account.email ? ` (${account.email})` : ''}`],
       ['Tool', toolLabel(toolOf(e.account))],

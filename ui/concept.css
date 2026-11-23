@@ -22,6 +22,15 @@
   --idle: #8e8e93;
   --done: #23893f;
   --closed: #7b8794;
+  /* Models, for teams: one colour each, as on the team page. */
+  --opus: #b4532a;
+  --opus-soft: #f8e7df;
+  --sonnet: #2f6fd0;
+  --sonnet-soft: #e1ebfa;
+  --haiku: #23874f;
+  --haiku-soft: #dff1e6;
+  --other: #64768a;
+  --other-soft: #e8ecf0;
 
   --folder-tab: #5fa8ea;
   --folder-body: #7bbef4;
@@ -63,6 +72,14 @@
     --idle: #9a9aa0;
     --done: #4cc06a;
     --closed: #6f7c8a;
+    --opus: #f08a5d;
+    --opus-soft: #3d2519;
+    --sonnet: #6aa6ff;
+    --sonnet-soft: #1a2a44;
+    --haiku: #5fd08e;
+    --haiku-soft: #16331f;
+    --other: #9fb0c2;
+    --other-soft: #2a3038;
     --folder-tab: #3f8fd8;
     --folder-body: #5aa9ec;
     --folder-shine: #8cc7f5;
@@ -97,6 +114,14 @@
   --idle: #9a9aa0;
   --done: #4cc06a;
   --closed: #6f7c8a;
+  --opus: #f08a5d;
+  --opus-soft: #3d2519;
+  --sonnet: #6aa6ff;
+  --sonnet-soft: #1a2a44;
+  --haiku: #5fd08e;
+  --haiku-soft: #16331f;
+  --other: #9fb0c2;
+  --other-soft: #2a3038;
   --folder-tab: #3f8fd8;
   --folder-body: #5aa9ec;
   --folder-shine: #8cc7f5;
@@ -466,4 +491,62 @@ button, input, select { font: inherit; color: inherit; }
   .search { flex: 1; min-width: 0; }
   .search input { width: 100%; }
   .tb .tb-settings { display: inline-flex; }
+}
+
+/* ------------------------------------------------------------------ teams */
+
+.tone-opus { --tone: var(--opus); --soft: var(--opus-soft); }
+.tone-sonnet { --tone: var(--sonnet); --soft: var(--sonnet-soft); }
+.tone-haiku { --tone: var(--haiku); --soft: var(--haiku-soft); }
+.tone-other { --tone: var(--other); --soft: var(--other-soft); }
+
+.teams { display: flex; flex-direction: column; gap: 1.4rem; max-width: 72rem; }
+.teams-h { display: flex; align-items: center; gap: 0.5rem; margin: 0 0 0.6rem; font-size: 13px; font-weight: 600; color: var(--muted); }
+.teams-count { font-weight: 500; color: var(--faint); }
+.teams-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(22rem, 1fr)); gap: 0.9rem; }
+
+.team-card { display: flex; flex-direction: column; gap: 0.75rem; padding: 0.85rem 0.95rem; border: 1px solid var(--line); border-radius: 10px; background: var(--window); }
+.team-card.is-working { border-color: color-mix(in srgb, var(--working) 45%, var(--line)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--working) 12%, transparent); }
+.tc-head { display: flex; align-items: flex-start; gap: 0.6rem; }
+.tc-title { min-width: 0; flex: 1; }
+.tc-title h3 { margin: 0; font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tc-where { margin: 0.1rem 0 0; color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tc-where .tagdot { margin-left: 0; }
+.tc-when { color: var(--faint); font-size: 12px; white-space: nowrap; }
+
+/* The lead on the left, its members down the right, joined like a tree. */
+.tc-flow { display: grid; grid-template-columns: auto 1fr; gap: 0 1.4rem; align-items: center; }
+.tc-lead { position: relative; display: flex; flex-direction: column; gap: 0.3rem; padding: 0.5rem 0.65rem; border: 1px solid var(--line); border-top: 3px solid var(--tone); border-radius: 8px; font-size: 12px; }
+.tc-lead::after { content: ""; position: absolute; left: 100%; top: 50%; width: 0.7rem; border-top: 1.5px solid var(--line); }
+.tc-role { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--faint); }
+.tc-chip { align-self: flex-start; padding: 0 0.45rem; border-radius: 999px; background: var(--soft); color: var(--tone); font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+.tc-members { list-style: none; margin: 0; padding: 0 0 0 0.7rem; border-left: 1.5px solid var(--line); display: flex; flex-direction: column; gap: 0.35rem; min-width: 0; }
+.tc-members:empty { display: none; }
+/* Dot, name and model on one line; what it is doing under them. */
+.tc-node { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 0.1rem 0.45rem; padding: 0.3rem 0.5rem; border-radius: 6px; background: var(--stripe); font-size: 12.5px; min-width: 0; }
+.tc-node .tc-task { grid-column: 2 / -1; font-size: 12px; }
+.tc-node::before { content: ""; position: absolute; right: 100%; top: 50%; width: 0.7rem; border-top: 1.5px solid var(--line); }
+.tc-node[data-state="running"] { background: var(--soft); }
+.tc-node[data-state="running"]::before { border-top: 1.5px dashed var(--tone); }
+.tc-dot { width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--idle); }
+.tc-node[data-state="done"] .tc-dot { background: var(--done); }
+.tc-node[data-state="running"] .tc-dot { background: var(--tone); animation: tc-pulse 1.2s ease-in-out infinite; }
+@keyframes tc-pulse { 50% { opacity: 0.25; } }
+.tc-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+/* Started by the session but not one of its members, such as Claude Code's own Explore. */
+.tc-node.is-other { background: transparent; border: 1px dashed var(--line); }
+.tc-task { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.tc-node[data-state="running"] .tc-task { color: var(--ink); }
+a.btn { text-decoration: none; color: inherit; }
+a.btn-primary { color: var(--on-accent); }
+.tc-foot { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.tc-used { flex: 1; color: var(--muted); font-size: 12px; }
+
+@media (max-width: 640px) {
+  .teams-grid { grid-template-columns: 1fr; }
+  .tc-flow { grid-template-columns: 1fr; gap: 0.6rem; }
+  .tc-lead::after { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tc-node[data-state="running"] .tc-dot { animation: none; }
 }

@@ -8,7 +8,7 @@
 // it in settings.css (one for light, one for dark).
 (() => {
   const TEMPLATES = [
-    { id: '', name: 'Each view’s own', note: 'Classic looks classic, Finder looks like a Mac.' },
+    { id: '', name: 'Each view’s own', note: 'Classic looks classic, Finder and Simple look like a Mac.' },
     { id: 'mac', name: 'Mac', note: 'System font, soft greys, rounded corners.',
       light: ['#f2f2f4', '#ffffff', '#1d1d1f', '#6b6b70', '#0a6cdc'], dark: ['#1c1c1e', '#242426', '#e8e8ea', '#a1a1a6', '#2f8cff'] },
     { id: 'classic', name: 'Classic', note: 'The original look: cool blue-greys.',
@@ -190,12 +190,12 @@
     const radio = (name, value, current, label, onchange, glyph) => h('label', { class: 'st-choice' },
       h('input', { type: 'radio', name, value, 'data-fk': `${name}:${value}`, checked: value === current, onchange }), glyph && icon(glyph), h('span', {}, label));
     // Which page shows the sessions. Picking the other one goes there, and Settings opens again on it.
-    const layout = location.pathname === '/' ? 'classic' : 'finder';
+    const layout = location.pathname === '/' ? 'classic' : location.pathname === '/simple' ? 'simple' : 'finder';
     const switchTo = (value) => {
       store('cc-view', value);
       if (value === layout) return;
       try { sessionStorage.setItem('cc-settings-reopen', 'appearance'); } catch { /* it just doesn't reopen */ }
-      location.replace(value === 'finder' ? '/finder' : '/');
+      location.replace({ finder: '/finder', simple: '/simple' }[value] || '/');
     };
 
     // A small picture of each template, in the current light or dark.
@@ -215,7 +215,8 @@
         h('h4', {}, 'Layout'),
         h('div', { class: 'st-choices', role: 'radiogroup', 'aria-label': 'Layout' },
           radio('st-layout', 'classic', layout, 'Classic: one list, with details beside it', () => switchTo('classic'), 'rows-3'),
-          radio('st-layout', 'finder', layout, 'Finder: folders you open, like a Mac', () => switchTo('finder'), 'folder-open')),
+          radio('st-layout', 'finder', layout, 'Finder: folders you open, like a Mac', () => switchTo('finder'), 'folder-open'),
+          radio('st-layout', 'simple', layout, 'Simple: a card for each project', () => switchTo('simple'), 'layout-grid')),
         h('p', { class: 'st-hint' }, 'The page opens in this layout from now on.')),
       h('section', { class: 'st-group' },
         h('h4', {}, 'Theme'),

@@ -50,7 +50,7 @@ const ART = {
 };
 // Sidebar and toolbar icons, from icons.js, by what they stand for here.
 const GLYPHS = {
-  recents: 'clock', needs: 'bell', loops: 'rotate-ccw', open: 'circle-play', usage: 'chart-column', home: 'house', all: 'folders', folder: 'folder',
+  recents: 'clock', needs: 'bell', loops: 'rotate-ccw', open: 'circle-play', teams: 'users', usage: 'chart-column', home: 'house', all: 'folders', folder: 'folder',
   icons: 'layout-grid', list: 'list', columns: 'columns-3', back: 'chevron-left', forward: 'chevron-right', search: 'search', settings: 'settings',
 };
 const glyph = (name) => {
@@ -96,7 +96,7 @@ function toast(message, kind = 'ok') {
 let token = new URLSearchParams(location.search).get('t');
 if (token) {
   store('cc-token', token);
-  history.replaceState(null, '', location.pathname);
+  history.replaceState(null, '', location.pathname + location.hash);
 } else {
   token = store('cc-token') || '';
 }
@@ -131,17 +131,20 @@ const SORTS = {
 };
 
 
+// The places in the sidebar that are not a folder or an account.
+const PLACES = ['recents', 'needs', 'loops', 'open', 'teams', 'usage'];
+
 const S = {
   data: null,
   history: null,
-  place: { kind: 'folder', id: '' },
+  place: fromAddress().place,     // where the page was, from the address, so a reload comes back to it
   back: [],
   forward: [],
   view: ['icons', 'list', 'columns'].includes(store('cc-concept-view')) ? store('cc-concept-view') : 'icons',
   sort: SORTS[store('cc-concept-sort')] ? store('cc-concept-sort') : 'active',
   sortDir: ['asc', 'desc'].includes(store('cc-concept-sort-dir')) ? store('cc-concept-sort-dir') : null,   // null: the column's own way
   scale: Number(store('cc-concept-scale')) || 1,
-  selected: null,      // an item key: 'f:<folder id>' or a session's key
+  selected: fromAddress().selected,   // an item key: 'f:<folder id>' or a session's key
   expanded: new Set(), // folders opened in the list view
   q: '',
   renaming: null,      // the key of the session whose name is being typed
@@ -219,10 +222,14 @@ function accountColor(name) {
   return (index >= 0 && accounts[index].color) || COLORS[(index < 0 ? 0 : index) % COLORS.length];
 }
 
+function toolOf(account) {
+  const found = S.data && S.data.accounts.find((a) => a.name === account);
+  return (found && found.tool) || 'claude';
+}
+
 // What the tool an account belongs to is called: Claude Code, or Codex.
 function toolName(account) {
-  const found = S.data && S.data.accounts.find((a) => a.name === account);
-  const tool = (found && found.tool) || 'claude';
+  const tool = toolOf(account);
   return window.ccTools ? window.ccTools.label(tool) : tool;
 }
 
@@ -268,6 +275,7 @@ function placeName(place = S.place) {
   if (place.kind === 'loops') return 'Worth a look';
   if (place.kind === 'open') return 'Open now';
   if (place.kind === 'usage') return 'Usage';
+  if (place.kind === 'teams') return 'Teams';
   if (place.kind === 'tag') return place.account;
   const node = tree.byId.get(place.id);
   return node ? node.label : 'All folders';
@@ -275,6 +283,29 @@ function placeName(place = S.place) {
 
 function samePlace(a, b) {
   return a.kind === b.kind && a.id === b.id && a.account === b.account;
+}
+
+// Where the page is, in the address: #teams, #f=<folder>, #a=<account>, with &s=<selected>.
+// A reload, or the link copied, opens the same place again.
+function toAddress() {
+  const place = S.place;
+  const where = PLACES.includes(place.kind) ? place.kind
+    : place.kind === 'tag' ? `a=${encodeURIComponent(place.account)}`
+      : place.id ? `f=${encodeURIComponent(place.id)}` : '';
+  const parts = [where, S.selected && `s=${encodeURIComponent(S.selected)}`].filter(Boolean);
+  return parts.length ? `#${parts.join('&')}` : '';
+}
+function fromAddress() {
+  const found = { place: { kind: 'folder', id: '' }, selected: null };
+  try {
+    for (const part of location.hash.slice(1).split('&').filter(Boolean)) {
+      if (PLACES.includes(part)) found.place = { kind: part };
+      else if (part.startsWith('f=')) found.place = { kind: 'folder', id: decodeURIComponent(part.slice(2)) };
+      else if (part.startsWith('a=')) found.place = { kind: 'tag', account: decodeURIComponent(part.slice(2)) };
+      else if (part.startsWith('s=')) found.selected = decodeURIComponent(part.slice(2));
+    }
+  } catch { /* a mangled address opens at the start */ }
+  return found;
 }
 
 function go(place, { remember = true } = {}) {
@@ -363,7 +394,7 @@ function itemsIn(place = S.place, { search = S.q } = {}) {
     sessions = entries.filter(needsYou);
   } else if (place.kind === 'open') {
     sessions = entries.filter((e) => e.open);
-  } else if (place.kind === 'usage') {
+  } else if (place.kind === 'usage' || place.kind === 'teams') {
     return [];
   } else {
     sessions = entries.filter((e) => e.account === place.account);
@@ -405,6 +436,8 @@ function render() {
   renderPath();
   renderStatus();
   if (S.quickLook) renderQuickLook();
+  const address = toAddress();
+  if (address !== location.hash) history.replaceState(null, '', location.pathname + address);
 }
 
 function sbItem({ place, icon, label, count, hot, color }) {
@@ -424,6 +457,8 @@ function renderSidebar() {
     // Sessions that may be going round in circles, once any session is big enough to be judged.
     entries.some((e) => loopOf(e) && loopOf(e).measured) && sbItem({ place: { kind: 'loops' }, icon: 'loops', label: 'Worth a look', count: entries.filter(worthALook).length }),
     sbItem({ place: { kind: 'open' }, icon: 'open', label: 'Open now', count: entries.filter((e) => e.open).length }),
+    // Counts the teams working now; its view also shows the ones that worked today.
+    sbItem({ place: { kind: 'teams' }, icon: 'teams', label: 'Teams', count: S.teams ? S.teams.filter(teamWorking).length : null, hot: true }),
     sbItem({ place: { kind: 'usage' }, icon: 'usage', label: 'Usage' }),
     h('div', { class: 'sb-head' }, 'Favourites'),
     home && sbItem({ place: { kind: 'folder', id: home }, icon: 'home', label: 'Home' }),
@@ -459,7 +494,7 @@ function renderToolbar() {
       h('button', { type: 'button', class: 'btn tb-settings', 'aria-label': 'Settings', title: 'Settings (⌘,)', onclick: () => window.ccSettings.open() }, glyph('settings')));
   }
   // The usage view has its own controls.
-  tb.classList.toggle('is-usage', S.place.kind === 'usage');
+  tb.classList.toggle('is-usage', S.place.kind === 'usage' || S.place.kind === 'teams');
   $('#back').disabled = !S.back.length;
   $('#forward').disabled = !S.forward.length;
   $('#title').textContent = S.q.trim() ? `Searching “${S.q.trim()}” in ${placeName()}` : placeName();
@@ -524,6 +559,14 @@ function renderContent() {
     content.replaceChildren(usageView());
     content.scrollTop = scroll;
     if (focused && SKY.canvas && SKY.canvas.isConnected) SKY.canvas.focus({ preventScroll: true });
+    return;
+  }
+  if (S.place.kind === 'teams') {
+    const scroll = content.scrollTop;
+    content.classList.remove('is-columns');
+    content.removeAttribute('aria-activedescendant');
+    content.replaceChildren(teamsView());
+    content.scrollTop = scroll;
     return;
   }
   const items = itemsIn();
@@ -663,6 +706,10 @@ function renderPath() {
 }
 
 function renderStatus() {
+  if (S.place.kind === 'teams') {
+    $('#statusbar').replaceChildren(h('span', {}, 'Claude Code sessions whose sub-agents worked in the last day. Updates every few seconds.'));
+    return;
+  }
   if (S.place.kind === 'usage') {
     $('#statusbar').replaceChildren(h('span', {}, 'Counted from the conversations Claude Code and Codex keep on this computer'));
     return;
@@ -723,7 +770,25 @@ function actionButtons(e) {
     e.command && h('button', { type: 'button', class: 'btn', onclick: () => copy(e.command) }, window.ccIcon('copy'), 'Copy command'),
     e.sessionId && h('button', { type: 'button', class: 'btn', onclick: () => { hideQuickLook(); startRename(e); } }, window.ccIcon('pencil'), 'Rename'),
     e.sessionId && h('button', { type: 'button', class: 'btn', onclick: () => pin(e) }, window.ccIcon(e.pinned ? 'pin-off' : 'pin'), e.pinned ? 'Unpin' : 'Pin'),
+    hasTeam(e) && h('button', { type: 'button', class: 'btn', title: 'Its sub-agents, as a team', onclick: () => openTeam(e) }, window.ccIcon('users'), 'Team'),
   ];
+}
+
+// A Claude Code session's sub-agents, drawn as a team, on a page of their own.
+const teamUrl = (account, sessionId) => `/team?account=${encodeURIComponent(account)}&session=${encodeURIComponent(sessionId)}`;
+
+// A page in a new tab, through a link: this page's own open() (for sessions) takes the
+// place of window.open, as a function declared in a script does.
+function newTab(url) {
+  const link = h('a', { href: url, target: '_blank', rel: 'noopener' });
+  document.body.append(link);
+  link.click();
+  link.remove();
+}
+
+const hasTeam = (e) => Boolean(e.sessionId) && toolOf(e.account) === 'claude';
+function openTeam(e) {
+  newTab(teamUrl(e.account, e.sessionId));
 }
 
 function renderQuickLook() {
@@ -744,6 +809,94 @@ function hideQuickLook() {
   S.quickLook = false;
   $('#ql').hidden = true;
   $('#content').focus({ preventScroll: true });
+}
+
+// --------------------------------------------------------------------- teams
+
+const teamWorking = (t) => t.runs.some((run) => run.state === 'running');
+
+async function loadTeams() {
+  if (S.stopped || S.teamsLoading) return;
+  S.teamsLoading = true;
+  try {
+    const teams = (await api('/api/teams')).teams;
+    S.teamsAt = Date.now();
+    const changed = JSON.stringify(teams) !== JSON.stringify(S.teams);
+    S.teams = teams;
+    if (changed && $('#menu').hidden && !S.renaming) render();
+  } catch (err) {
+    if (S.place.kind === 'teams') toast(`Could not read the teams: ${err.message}`, 'error');
+  }
+  S.teamsLoading = false;
+}
+
+// "opus", "claude-sonnet-5-5" and the like, as a colour and a short name.
+function modelTone(model) {
+  const id = String(model || '').toLowerCase();
+  const family = ['opus', 'sonnet', 'haiku'].find((f) => id.includes(f));
+  if (!family) return { tone: 'other', label: model ? model.replace(/^claude-/, '') : '…' };
+  const numbers = id.replace(/\[.*\]$/, '').replace(/-\d{8}$/, '').replace(family, '').split('-').filter((p) => /^\d+$/.test(p));
+  return { tone: family, label: `${family[0].toUpperCase()}${family.slice(1)}${numbers.length ? ` ${numbers.join('.')}` : ''}` };
+}
+
+const LEAD_STATUS = { working: 'Working', blocked: 'Waiting for you', idle: 'Idle', done: 'Done', closed: 'Closed' };
+
+function teamCard(t) {
+  const lead = modelTone(t.lead.model);
+  const status = LEAD_STATUS[t.status] ? t.status : t.open ? 'idle' : 'closed';
+  // Members first, as the team page draws them, then whatever else the session started.
+  const names = [...t.members.map((m) => m.name), ...new Set(t.runs.map((run) => run.type))].filter((n, i, all) => all.indexOf(n) === i);
+  const nodes = names.map((name) => {
+    const member = t.members.find((m) => m.name === name);
+    const runs = t.runs.filter((run) => run.type === name);
+    const used = runs.map((run) => run.model).find(Boolean);
+    const model = modelTone(member && member.model !== 'inherit' ? member.model : used || t.lead.model);
+    const state = runs.some((run) => run.state === 'running') ? 'running' : runs.length ? 'done' : 'idle';
+    const last = runs[runs.length - 1];
+    return h('li', { class: `tc-node tone-${model.tone}${member ? '' : ' is-other'}`, 'data-state': state,
+      title: `${member ? '' : 'Not on the team. '}${last ? last.task : 'Not used yet'}` },
+      h('span', { class: 'tc-dot' }),
+      h('span', { class: 'tc-name' }, name),
+      h('span', { class: 'tc-chip' }, model.label),
+      h('span', { class: 'tc-task' }, state === 'running' ? last.task : runs.length ? `${runs.length === 1 ? 'Ran once' : `Ran ${runs.length} times`}` : 'Not used yet'));
+  });
+  const used = t.runs.reduce((sum, run) => sum + tokenSum(run.tokens), 0);
+  const last = Math.max(0, ...t.runs.map((run) => run.lastAt));
+  return h('article', { class: `team-card${teamWorking(t) ? ' is-working' : ''}` },
+    h('header', { class: 'tc-head' },
+      h('div', { class: 'tc-title' },
+        h('h3', {}, t.title),
+        h('p', { class: 'tc-where' }, h('span', { class: 'tagdot', style: { '--acct': accountColor(t.account) } }), ` ${t.account} · `, t.cwd.replace(/^\/Users\/[^/]+/, '~'))),
+      h('span', { class: 'tc-when', title: fullDate(last) }, ago(last))),
+    h('div', { class: 'tc-flow' },
+      h('div', { class: `tc-lead tone-${lead.tone}`, 'data-status': status },
+        h('span', { class: 'tc-role' }, 'Lead'),
+        h('span', { class: 'tc-chip' }, t.lead.model ? lead.label : 'No replies yet'),
+        h('span', { class: 'st', 'data-status': status }, LEAD_STATUS[status])),
+      h('ul', { class: 'tc-members' }, nodes)),
+    h('footer', { class: 'tc-foot' },
+      h('span', { class: 'tc-used' }, `${plural(t.runs.length, 'sub-agent run')} · ${tokens(used)} tokens`),
+      status === 'blocked' && t.key && h('button', { type: 'button', class: 'btn', onclick: () => act(() => api('/api/sessions/resume', { key: t.key }), 'Opened in a terminal.') },
+        window.ccIcon('square-terminal'), 'Open in a terminal'),
+      h('a', { class: 'btn btn-primary', href: teamUrl(t.account, t.sessionId), target: '_blank', rel: 'noopener' }, window.ccIcon('users'), 'Open team')));
+}
+
+function teamsView() {
+  if (!S.teams) {
+    loadTeams();
+    return h('p', { class: 'empty' }, 'Looking for teams…');
+  }
+  if (!S.teams.length) {
+    return h('p', { class: 'empty' }, 'No team has worked in the last day. To set one up, right-click a Claude Code session and choose Team.');
+  }
+  const working = S.teams.filter(teamWorking);
+  const earlier = S.teams.filter((t) => !teamWorking(t));
+  const section = (title, list) => list.length > 0 && h('section', { class: 'teams-section' },
+    h('h2', { class: 'teams-h' }, title, h('span', { class: 'teams-count' }, String(list.length))),
+    h('div', { class: 'teams-grid' }, list.map(teamCard)));
+  return h('div', { class: 'teams' },
+    section('Working now', working),
+    section(working.length ? 'Earlier today' : 'In the last day', earlier));
 }
 
 // --------------------------------------------------------------------- usage
@@ -1404,7 +1557,8 @@ function closeSessions(sessions) {
   const confirm = h('button', { type: 'submit', class: 'btn btn-danger' }, one ? 'Close session' : 'Close ticked sessions');
   sheet.replaceChildren(h('form', { method: 'dialog', onsubmit: async (event) => {
     event.preventDefault();
-    const keys = [...sheet.querySelectorAll('input:checked')].map((box) => box.value);
+    // From the boxes themselves: a single session's is ticked but never shown, so it is not in the sheet.
+    const keys = boxes.map((label) => label.querySelector('input')).filter((box) => box.checked).map((box) => box.value);
     sheet.close();
     if (!keys.length) return;
     const result = await act(() => api('/api/sessions/close', { keys }));
@@ -1479,6 +1633,7 @@ function showMenu(x, y, item) {
       e.command && entryButton(e.open ? 'Open in a terminal' : 'Resume', () => resume(e), '⌘O', false, e.open ? 'square-terminal' : 'play'),
       editorFor(e) && entryButton(`Open in ${editorFor(e)}`, () => openInEditor(e), '⌘E', false, 'square-code'),
       e.command && entryButton('Copy command', () => copy(e.command), null, false, 'copy'),
+      hasTeam(e) && entryButton('Team', () => openTeam(e), null, false, 'users'),
       h('hr'),
       e.sessionId && entryButton('Rename', () => startRename(e), '↩', false, 'pencil'),
       e.sessionId && entryButton(e.pinned ? 'Unpin' : 'Pin to the top', () => pin(e), null, false, e.pinned ? 'pin-off' : 'pin'),
@@ -1635,5 +1790,7 @@ refresh().then(loadHistory);
 setInterval(() => { if (!document.hidden) refresh(); }, 5000);
 setInterval(() => { if (!document.hidden) loadHistory(); }, 20000);
 setInterval(() => { if (!document.hidden && S.place.kind === 'usage') loadUsage(); }, 60000);
+// Teams: every few seconds while looking at them, else now and then for the sidebar's count.
+setInterval(() => { if (!document.hidden && (S.place.kind === 'teams' || Date.now() - (S.teamsAt || 0) > 30000)) loadTeams(); }, 4000);
 setInterval(() => { if (!document.hidden && $('#menu').hidden && !S.renaming) render(); }, 60000);
 $('#content').focus();

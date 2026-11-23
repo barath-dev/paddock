@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Team · Paddock</title>
+  <link rel="icon" href="/favicon.svg">
+  <script src="/theme.js"></script>
+  <script src="/icons.js"></script>
+  <link rel="stylesheet" href="/team.css">
+  <script src="/team.js" defer></script>
+</head>
+<body>
+  <header class="top">
+    <a class="back" href="/" id="back"></a>
+    <div class="heading">
+      <h1 id="title">Team</h1>
+      <p class="where" id="where"></p>
+    </div>
+    <div class="top-actions" id="top-actions"></div>
+  </header>
+
+  <main class="page">
+    <section class="board" aria-labelledby="board-title">
+      <h2 class="sr-only" id="board-title">How the team works</h2>
+      <div class="diagram" id="diagram"></div>
+      <p class="note" id="note"></p>
+    </section>
+    <section class="launch" id="run" aria-labelledby="run-title"></section>
+    <section class="runs" aria-labelledby="runs-title">
+      <h2 class="section-title" id="runs-title">What the team did</h2>
+      <div id="runs"></div>
+    </section>
+  </main>
+
+  <dialog class="sheet" id="sheet" aria-labelledby="sheet-title"></dialog>
+  <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+</body>
+</html>

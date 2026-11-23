@@ -283,7 +283,7 @@ pub fn note_prompt(entry: &mut Entry, typed: &mut Vec<String>, prompt: &str) {
 }
 
 /// Read one saved conversation into a small summary. Never writes to it.
-fn index_transcript(path: &Path) -> Entry {
+pub fn index_transcript(path: &Path) -> Entry {
     let mut entry = Entry {
         session_id: path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default(),
         ..Entry::default()
