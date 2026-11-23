@@ -21,6 +21,20 @@ fn now_ms() -> i64 {
     SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as i64
 }
 
+/// Start a program that was copied into place a moment ago. On Linux, a process
+/// another test starts during the copy holds the new file open for writing until
+/// it runs its own program, and until then starting this one fails with "Text file
+/// busy". That passes in moments, so try again for a while.
+fn spawn_copied(cmd: &mut Command) -> Child {
+    let deadline = Instant::now() + Duration::from_secs(2);
+    loop {
+        match cmd.spawn() {
+            Err(e) if e.kind() == std::io::ErrorKind::ExecutableFileBusy && Instant::now() < deadline => thread::sleep(Duration::from_millis(20)),
+            other => return other.unwrap(),
+        }
+    }
+}
+
 /// A process that plays a running Claude session; ended when dropped.
 ///
 /// A background thread waits on it, the way a shell does for a real session,
@@ -518,7 +532,7 @@ fn codex_sessions_beside_claude_code() {
     if cfg!(unix) {
         let program = m.root.join("bin").join("codex");
         fs::copy(FAKE_CLAUDE, &program).unwrap();
-        let mut holder = Command::new(&program).arg("hold").arg(&rollout).current_dir(&project).stdin(Stdio::null()).spawn().unwrap();
+        let mut holder = spawn_copied(Command::new(&program).arg("hold").arg(&rollout).current_dir(&project).stdin(Stdio::null()));
         let pid = holder.id();
         // Waited on as a shell would, so once it exits it is gone rather than left a zombie.
         let ended = Arc::new(AtomicBool::new(false));
