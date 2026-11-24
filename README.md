@@ -440,6 +440,8 @@ Each release adds its notes to the top of `ui/changes.json` (version, date, titl
 which the What's new window reads. `cargo test` fails if the first entry is not the
 version in `Cargo.toml`, so bump both together.
 
+To help build Paddock, see [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## Licence
 
 MIT. See [LICENSE](LICENSE). The icons are from [Lucide](https://lucide.dev) (ISC licence;
